@@ -8,13 +8,12 @@ import Data.List (sortBy)
 import Parse
 
 import Data.ByteString.Lazy.Char8 (unpack)
---I don't use this website, so I don't know for sure why some of the comments are 'dead', perhaps low karma or some
---equivalent of posting score. Example: https://news.ycombinator.com/item?id=22103329 these 'dead' comments are not
---counted at the main page in the comments counter, however I count them.
+--I don't use this website, so I don't know for sure why some of the comments are 'dead', perhaps user score.  Example:
+--https://news.ycombinator.com/item?id=22103329 these 'dead' comments are not counted at the main page in the comments
+--counter, however I count them.
  
 --Also I've encountered null value: https://hacker-news.firebaseio.com/v0/item/22104036.json that's why I defined an
 --emptyItem in Parse.hs.
-
 
 taketops :: IO [Int]
 taketops = do
@@ -74,7 +73,6 @@ main = do
     let top30 = take 30 stories
     withAsync (mapConcurrently titleOfStory top30) $ \x -> do
     topTitles <- wait x
-    --topTitles <- mapConcurrently titleOfStory top30
     topComments <- mapConcurrently author top30
     mapM_ putStrLn topTitles
     let topCommenters = take 10 $ sortedByOccurences $ concat topComments

@@ -6,9 +6,7 @@ import GHC.Generics
 import Data.Aeson
 import Data.ByteString.Lazy.Internal
 import Control.Applicative
-
---debug
-import Data.Maybe
+import Data.Maybe (fromJust)
 
 data Item = Item {
         by :: Maybe String,
