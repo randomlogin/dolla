@@ -8,6 +8,7 @@ import Data.ByteString.Lazy.Internal
 import Control.Applicative
 import Data.Maybe (fromJust)
 
+--generic item: cooment or story
 data Item = Item {
         by :: Maybe String,
         descendants :: Maybe Int,
