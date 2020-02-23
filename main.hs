@@ -5,7 +5,7 @@ import Network.HTTP.Client (method, parseRequest)
 import Network.HTTP.Simple (httpLBS, getResponseBody)
 
 import System.IO (stdout, hSetBuffering, BufferMode(LineBuffering))
-import Streamly (asyncly, parallely)
+import Streamly (asyncly, parallely, async, aheadly)
 
 import Parse
 import Data.Either (rights)
@@ -17,9 +17,7 @@ import qualified Streamly.Prelude as S
 import qualified Streamly.Internal.Prelude as S
 import qualified Streamly.Internal.Data.Stream.StreamK.Type as T 
 
-
-
---retrieves top stories
+--retrieves top stories ids
 takeTopStories :: IO [Int]
 takeTopStories = do
     let link = "https://hacker-news.firebaseio.com/v0/topstories.json"
@@ -51,7 +49,7 @@ itemToAuthorAndKids item = S.fromList $ nickname:children
                  children = case kids item of 
                   Nothing -> []
                   Just b -> map (\x -> Left x) b
- 
+
 --takes id of the comment, produces stream of its author and subcomments
 idToAuthorAndKids :: (T.IsStream t) => Int -> t IO (Either Int String)
 idToAuthorAndKids int = S.concatMap itemToAuthorAndKids $ S.mapM getItem $ S.yield int
@@ -64,21 +62,28 @@ frequency xs = toList (fromListWith (+) [(x, 1) | x <- xs])
 --sorting by the most frequent first
 sortedByOccurences xs = sortBy (\x y -> compare (snd y) (snd x)) $ frequency xs
 
+printTitleReturnItem it = do 
+    putStrLn $ fromJust $ title it
+    return it
 
+--How it works:
+--First, pulling identificators of top 30 stories, next it's needed to print their titles, to do so it's needed to make
+--a query to each story and retrieve it titiles. It's done via streamly without discarding the result of query, so it
+--can be used later. Not the most beautiful code, but it's better than to make the same query twice (once for titles,
+--once for aceessing its subcomments).
+    
+--Next the resulting stream is iteratevily processed by accessing children of the current iteration.
 main = do
     hSetBuffering stdout LineBuffering
     putStrLn "Top 30 stories are: "
     topStories <- takeTopStories --retrieving top stories
 
-    --in fact, here instead of simultaneously printing titles of top stories and then processing them I make and
-    --additional query to get their titles, top stories are printed in random order, they are not sorted
-    S.drain $ asyncly $ S.mapM (print . fromJust . title) $ S.mapM getItem $ S.fromList $ take 30 topStories
+    unsortedCommenters <- S.toList $ asyncly $
+        S.concatMapTreeWith async idToAuthorAndKids $ -- 4. process the stream of author and subcomments untile there are no subcomments
+        S.concatMap itemToAuthorAndKids $ -- 3. transform item stream into stream of author and subcomments
+        S.mapM printTitleReturnItem $ -- 2. print titles of items 
+        S.mapM getItem $ S.fromList $ take 30 topStories  -- 1. retrieve items by given top 30 id
 
-    putStrLn "\nTop 10 commenters are:"
-    let top30 = map (\x -> Left x) $ take 30 topStories --taking top 30, making list of Left
-
-    unsortedCommenters <- S.toList $ asyncly $ S.concatMapTreeWith async idToAuthorAndKids $ S.fromList $ top30 --instead of transforming into list, it's possible to filter by Right using streamly, but the difference is neglectable
     let topCommenters = sortedByOccurences $ filter (/= "") $ rights unsortedCommenters --removing empty author of comment (deleted comment)
+    putStrLn "\nTop 10 commenters are:"
     mapM_ putStrLn $ map show $ take 10 topCommenters
-
-
