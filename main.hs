@@ -71,7 +71,7 @@ main = do
     topStories <- takeTopStories --retrieving top stories
 
     --in fact, here instead of simultaneously printing titles of top stories and then processing them I make and
-    --additional query to get their titles
+    --additional query to get their titles, top stories are printed in random order, they are not sorted
     S.drain $ asyncly $ S.mapM (print . fromJust . title) $ S.mapM getItem $ S.fromList $ take 30 topStories
 
     putStrLn "\nTop 10 commenters are:"
